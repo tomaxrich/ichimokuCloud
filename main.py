@@ -22,28 +22,57 @@ class CommodityApp(tk.Tk):
         self.geometry("1200x800")
 
         # Scrollable Frame Setup
-        canvas = tk.Canvas(self)
-        scrollbar = tk.Scrollbar(self, orient="vertical", command=canvas.yview)
+        # Canvas container
+        container = tk.Frame(self)
+        container.grid(row=0, column=0, sticky="nsew")
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
+        canvas = tk.Canvas(container)
+        scrollbar = tk.Scrollbar(container, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        scrollbar.grid(row=0, column=1, sticky='ns')
+        canvas.grid(row=0, column=0, sticky='nsew')
+
+        container.grid_rowconfigure(0, weight=1)
+        container.grid_columnconfigure(0, weight=1)
+
+        # Scrollable content frame
         self.scrollable_frame = tk.Frame(canvas)
+        canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
 
         self.scrollable_frame.bind(
             "<Configure>",
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
+)
 
-        canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
 
         # Add commodity blocks
-        for name, symbol in COMMODITIES.items():
-            self.create_commodity_block(name, symbol)
+        columns = 2  # Adjust to 3 if you want tighter boxes   
+        row = 0
+        col = 0
 
-    def create_commodity_block(self, name, symbol):
-        frame = ttk.LabelFrame(self.scrollable_frame, text=name, padding=10)
-        frame.pack(fill="x", padx=10, pady=10)
+        for name, symbol in COMMODITIES.items():
+            self.create_commodity_block(name, symbol, row, col)
+            col += 1
+            if col >= columns:
+                col = 0
+                row += 1
+
+    def create_commodity_block(self, name, symbol, row, col):
+        
+
+        frame = tk.Frame(self.scrollable_frame, bg="#1e1e1e", bd=2, relief="groove")
+        frame.grid(row=row, column=col, padx=12, pady=12, sticky="nsew")
+
+        # Make columns expand evenly
+        self.scrollable_frame.grid_columnconfigure(col, weight=1)
+
+        # Commodity Title Label
+        tk.Label(frame, text=name, font=("Segoe UI", 14, "bold"), fg="#ffffff", bg="#1e1e1e").grid(row=0, column=0, sticky="w", padx=10, pady=(5, 0))
+        frame.grid_columnconfigure(0, weight=1)
+
 
         # Fetch historical data
         end = datetime.datetime.now()
@@ -52,12 +81,20 @@ class CommodityApp(tk.Tk):
 
         # Plot closing price
         fig, ax = plt.subplots(figsize=(6, 2), dpi=100)
-        data['Close'].plot(ax=ax, title=f"{name} Price")
-        ax.set_ylabel("USD")
+        fig.patch.set_facecolor("#1e1e1e")
+        ax.set_facecolor("#2b2b2b")
+        data['Close'].plot(ax=ax, color="cyan", linewidth=1.5)
 
+        ax.set_title(f"{name} Price", color="white")
+        ax.tick_params(axis='x', colors='white')
+        ax.tick_params(axis='y', colors='white')
+        ax.set_ylabel("USD", color="white")
+
+        ax.grid(False)
         canvas = FigureCanvasTkAgg(fig, master=frame)
         canvas.draw()
-        canvas.get_tk_widget().pack(fill="x")
+        canvas.get_tk_widget().grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
+
 
         # Display simple stats
         #latest_close = data['Close'].iloc[-1]
