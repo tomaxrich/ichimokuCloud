@@ -78,6 +78,29 @@ class CommodityApp(tk.Tk):
         end = datetime.datetime.now()
         start = end - datetime.timedelta(days=180)
         data = yf.download(symbol, start=start, end=end)
+        if data.empty:
+            print(f"[WARN] No data for {name}")
+            return
+
+        # Ichimoku Cloud Calculation
+        high_9 = data['High'].rolling(window=9).max()
+        low_9 = data['Low'].rolling(window=9).min()
+        tenkan_sen = (high_9 + low_9) / 2
+
+        high_26 = data['High'].rolling(window=26).max()
+        low_26 = data['Low'].rolling(window=26).min()
+        kijun_sen = (high_26 + low_26) / 2
+
+        senkou_a = ((tenkan_sen + kijun_sen) / 2).shift(26)
+
+
+        high_52 = data['High'].rolling(window=52).max()
+        low_52 = data['Low'].rolling(window=52).min()
+        senkou_b = ((high_52 + low_52) / 2).shift(26)
+
+
+
+        chikou_span = data['Close'].shift(-26)
 
         # Plot closing price
         fig, ax = plt.subplots(figsize=(6, 2), dpi=100)
@@ -85,10 +108,46 @@ class CommodityApp(tk.Tk):
         ax.set_facecolor("#2b2b2b")
         data['Close'].plot(ax=ax, color="cyan", linewidth=1.5)
 
+        import pandas as pd  # Ensure this is at the top
+
+        # Build Ichimoku DataFrame and drop NaNs
+        ichimoku_df = pd.DataFrame({
+            "SenkouA": senkou_a.squeeze(),
+            "SenkouB": senkou_b.squeeze()
+        }, index=data.index).dropna()
+
+
+        # Sanity check
+        if ichimoku_df.empty:
+            print(f"[WARN] Ichimoku data for {name} not sufficient.")
+            return
+        
+        ax.fill_between(
+            ichimoku_df.index, ichimoku_df["SenkouA"], ichimoku_df["SenkouB"],
+            where=(ichimoku_df["SenkouA"] > ichimoku_df["SenkouB"]),
+            color='green', alpha=0.2, interpolate=True
+        )
+
+        ax.fill_between(
+            ichimoku_df.index, ichimoku_df["SenkouA"], ichimoku_df["SenkouB"],
+            where=(ichimoku_df["SenkouA"] < ichimoku_df["SenkouB"]),
+            color='red', alpha=0.2, interpolate=True
+        )
+
+
+        ax.plot(tenkan_sen, label='Tenkan-sen', color='magenta', linewidth=0.8)
+        ax.plot(kijun_sen, label='Kijun-sen', color='orange', linewidth=0.8)
+        ax.plot(senkou_a, label='Senkou A', color='green', linewidth=0.8)
+        ax.plot(senkou_b, label='Senkou B', color='red', linewidth=0.8)
+        ax.plot(chikou_span, label='Chikou', color='gray', linestyle=':', linewidth=0.8)
+
+
         ax.set_title(f"{name} Price", color="white")
         ax.tick_params(axis='x', colors='white')
         ax.tick_params(axis='y', colors='white')
         ax.set_ylabel("USD", color="white")
+
+        #ax.legend(loc='upper left', fontsize='small')
 
         ax.grid(False)
         canvas = FigureCanvasTkAgg(fig, master=frame)
